@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/SkycoinProject/skycoin/src/util/logging"
 )
@@ -68,4 +69,28 @@ func Deserialize(data []byte) (*Packet, error) {
 	}
 
 	return &packet, nil
+}
+
+func serialize(packet Packet) ([]byte, error) {
+	var buff bytes.Buffer
+	decoder := gob.NewEncoder(&buff)
+	err := decoder.Encode(packet)
+	if err != nil {
+		return nil, err
+	}
+
+	return buff.Bytes(), nil
+}
+
+func write(data []byte, filePath string) error {
+	logger(moduleName).Info("Opening named pipe for writing")
+	stdOut, err := os.OpenFile(filePath, os.O_RDWR, 0600)
+	if err != nil {
+		return err
+	}
+
+	stdOut.Write(data)
+	stdOut.Close()
+
+	return nil
 }
