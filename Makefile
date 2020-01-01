@@ -6,6 +6,9 @@ dep: ## Sorts dependencies
 
 build: dep bin ## Install dependencies, build binary. `go build` with ${OPTS} 
 
+install: ## install `skywire-peering-daemon`
+	${OPTS} go install ./cmd/daemon
+
 bin: ## build auto-peering-daemon [`apd`]
 	${OPTS} go build -o ./skywire-peering-daemon ./cmd/daemon
 

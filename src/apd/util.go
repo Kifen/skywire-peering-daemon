@@ -60,15 +60,15 @@ func getLocalIP() string {
 	return localIP
 }
 
-func Deserialize(data []byte) (*Packet, error) {
+func Deserialize(data []byte) (Packet, error) {
 	var packet Packet
 	decoder := gob.NewDecoder(bytes.NewReader(data))
 	err := decoder.Decode(&packet)
 	if err != nil {
-		return nil, err
+		return Packet{}, err
 	}
 
-	return &packet, nil
+	return packet, nil
 }
 
 func serialize(packet Packet) ([]byte, error) {
