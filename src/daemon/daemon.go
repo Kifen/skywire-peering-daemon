@@ -22,9 +22,8 @@ type Packet struct {
 	IP        string
 }
 
-type APD struct {
+type Daemon struct {
 	PublicKey string
-	LocalIP   string
 	PacketMap map[string]string
 	DoneCh    chan error
 	PacketCh  chan Packet
@@ -33,59 +32,58 @@ type APD struct {
 }
 
 // NewApd returns an Apd type
-func NewApd(pubKey, namedPipe string) *APD {
+func NewDaemon(pubKey, namedPipe string) *APD {
 	return &APD{
 		PublicKey: pubKey,
-		LocalIP:   getLocalIP(),
 		PacketMap: make(map[string]string),
 		DoneCh:    make(chan error),
 		PacketCh:  make(chan Packet, packetLength),
-		logger:    logger("APD"),
+		logger:    logger("SPD"),
 		NamedPipe: namedPipe,
 	}
 }
 
 // BroadCastPubKey broadcasts a UDP packet which contains a public key
 // to the local network's broadcast address.
-func (apd *APD) BroadCastPubKey(broadCastIP string, timer *time.Ticker, port int) {
-	apd.logger.Infof("broadcasting on address %s:%d", defaultBroadCastIP, port)
+func (d *Daemon) BroadCastPubKey(broadCastIP string, timer *time.Ticker, port int) {
+	d.logger.Infof("broadcasting on address %s:%d", defaultBroadCastIP, port)
 	for range timer.C {
-		apd.logger.Infof("broadcasting public key")
-		err := BroadCastPubKey(apd.PublicKey, broadCastIP, port)
+		d.logger.Infof("broadcasting public key")
+		err := BroadCastPubKey(d.PublicKey, broadCastIP, port)
 		if err != nil {
-			apd.logger.Error(err)
-			apd.DoneCh <- err
+			d.logger.Error(err)
+			d.DoneCh <- err
 			return
 		}
 	}
 }
 
 // Listen listens for incoming broadcasts on a local network, and reads incoming UDP broadcasts.
-func (apd *APD) Listen(port int) {
+func (d *Daemon) Listen(port int) {
 	address := fmt.Sprintf(":%d", port)
 	udpAddr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
-		apd.logger.Error(err)
-		apd.DoneCh <- err
+		d.logger.Error(err)
+		d.DoneCh <- err
 		return
 	}
 
 	conn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		apd.logger.Error(err)
-		apd.DoneCh <- err
+		d.logger.Error(err)
+		d.DoneCh <- err
 		return
 	}
 
 	defer conn.Close()
-	apd.logger.Infof("listening on address %s", address)
+	d.logger.Infof("listening on address %s", address)
 
 	for {
 		buffer := make([]byte, 1024)
 		n, addr, err := conn.ReadFromUDP(buffer)
 		if err != nil {
-			apd.logger.Error(err)
-			apd.DoneCh <- err
+			d.logger.Error(err)
+			d.DoneCh <- err
 			return
 		}
 
@@ -94,27 +92,27 @@ func (apd *APD) Listen(port int) {
 			IP:        addr.String(),
 		}
 
-		apd.PacketCh <- message
+		d.PacketCh <- message
 	}
 }
 
 // Run starts an auto-peering daemon process in two goroutines.
 // The daemon broadcasts a public key in a goroutine, and listens
 // for incoming broadcasts in another goroutine.
-func (apd *APD) Run() {
-	apd.logger.Infof("%s: %s", apd.PublicKey, apd.NamedPipe)
+func (d *Daemon) Run() {
+	d.logger.Infof("%s: %s", d.PublicKey, d.NamedPipe)
 	t := time.NewTicker(10 * time.Second)
 
 	shutDownCh := make(chan os.Signal)
 	signal.Notify(shutDownCh, syscall.SIGTERM, syscall.SIGINT)
 
-	apd.logger.Info("Auto-peering-daemon started")
+	d.logger.Info("Auto-peering-daemon started")
 
 	// send broadcasts at ten minute intervals
-	go apd.BroadCastPubKey(defaultBroadCastIP, t, port)
+	go d.BroadCastPubKey(defaultBroadCastIP, t, port)
 
 	// listen for incoming broadcasts
-	go apd.Listen(port)
+	go d.Listen(port)
 
 	go func(timer *time.Ticker) {
 		for range timer.C {
@@ -124,20 +122,20 @@ func (apd *APD) Run() {
 			})
 			err := write(data, apd.NamedPipe)
 			if err != nil {
-				apd.logger.Fatalf("Error writing to named pipe: %s", err)
+				d.logger.Fatalf("Error writing to named pipe: %s", err)
 			}
 		}
 	}(t)
 
 	for {
 		select {
-		case <-apd.DoneCh:
-			apd.logger.Fatal("Shutting down daemon")
+		case <-d.DoneCh:
+			d.logger.Fatal("Shutting down daemon")
 			os.Exit(1)
-		case packet := <-apd.PacketCh:
-			apd.RegisterPubKey(packet)
+		case packet := <-d.PacketCh:
+			d.RegisterPubKey(packet)
 		case <-shutDownCh:
-			apd.logger.Print("Shutting down daemon")
+			d.logger.Print("Shutting down daemon")
 			os.Exit(1)
 		}
 	}
@@ -145,19 +143,19 @@ func (apd *APD) Run() {
 
 // RegisterPubKey checks if a public key received from a broadcast is already registered.
 // It adds only new public keys to a map, and sends the registered packet over a named pipe.
-func (apd *APD) RegisterPubKey(packet Packet) {
-	if apd.PublicKey != packet.PublicKey {
-		if _, ok := apd.PacketMap[packet.PublicKey]; !ok {
-			apd.PacketMap[packet.PublicKey] = packet.IP
-			apd.logger.Infof("Received packet %s: %s", packet.PublicKey, packet.IP)
+func (d *Daemon) RegisterPubKey(packet Packet) {
+	if d.PublicKey != packet.PublicKey {
+		if _, ok := d.PacketMap[packet.PublicKey]; !ok {
+			d.PacketMap[packet.PublicKey] = packet.IP
+			d.logger.Infof("Received packet %s: %s", packet.PublicKey, packet.IP)
 			data, err := serialize(packet)
 			if err != nil {
-				apd.logger.Fatalf("Couldn't seralize packet: %s", err)
+				d.logger.Fatalf("Couldn't seralize packet: %s", err)
 			}
 
-			err = write(data, apd.NamedPipe)
+			err = write(data, d.NamedPipe)
 			if err != nil {
-				apd.logger.Fatalf("Error writing to named pipe: %s", err)
+				d.logger.Fatalf("Error writing to named pipe: %s", err)
 			}
 		}
 	}
