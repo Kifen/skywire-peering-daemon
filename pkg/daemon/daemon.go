@@ -32,7 +32,7 @@ type Daemon struct {
 	PacketMap map[string]string
 	DoneCh    chan error
 	PacketCh  chan []byte
-	Logger    *logging.Logger
+	logger    *logging.Logger
 	NamedPipe string
 }
 
@@ -44,7 +44,7 @@ func NewDaemon(pubKey, lAddr, namedPipe string) *Daemon {
 		PacketMap: make(map[string]string),
 		DoneCh:    make(chan error),
 		PacketCh:  make(chan []byte, packetLength),
-		Logger:    logger("SPD"),
+		logger:    logger("SPD"),
 		NamedPipe: namedPipe,
 	}
 }
@@ -52,11 +52,11 @@ func NewDaemon(pubKey, lAddr, namedPipe string) *Daemon {
 // BroadCastPacket broadcasts a UDP packet which contains a public key
 // to the local network's broadcast address.
 func (d *Daemon) BroadCastPacket(broadCastIP string, timer *time.Ticker, port int, data []byte) {
-	d.Logger.Infof("Broadcasting packet on address %s:%d", defaultBroadCastIP, port)
+	d.logger.Infof("Broadcasting packet on address %s:%d", defaultBroadCastIP, port)
 	for range timer.C {
 		err := BroadCast(broadCastIP, port, data)
 		if err != nil {
-			d.Logger.Error(err)
+			d.logger.Error(err)
 			d.DoneCh <- err
 			return
 		}
@@ -68,14 +68,14 @@ func (d *Daemon) Listen(port int) {
 	address := fmt.Sprintf(":%d", port)
 	udpAddr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
-		d.Logger.Error(err)
+		d.logger.Error(err)
 		d.DoneCh <- err
 		return
 	}
 
 	conn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		d.Logger.Error(err)
+		d.logger.Error(err)
 		d.DoneCh <- err
 		return
 	}
@@ -83,17 +83,17 @@ func (d *Daemon) Listen(port int) {
 	defer func() {
 		err := conn.Close()
 		if err != nil {
-			d.Logger.WithError(err)
+			d.logger.WithError(err)
 		}
 	}()
 
-	d.Logger.Infof("Listening on address %s", address)
+	d.logger.Infof("Listening on address %s", address)
 
 	for {
 		buffer := make([]byte, 1024)
 		n, _, err := conn.ReadFromUDP(buffer)
 		if err != nil {
-			d.Logger.Error(err)
+			d.logger.Error(err)
 			d.DoneCh <- err
 			return
 		}
@@ -109,7 +109,7 @@ func (d *Daemon) Listen(port int) {
 // The skywire-peering-daemon broadcasts a public key in a goroutine, and listens
 // for incoming broadcasts in another goroutine.
 func (d *Daemon) Run() {
-	d.Logger.Info("Skywire-peering-daemon started")
+	d.logger.Info("Skywire-peering-daemon started")
 	t := time.NewTicker(10 * time.Second)
 
 	shutDownCh := make(chan os.Signal, 1)
@@ -121,7 +121,7 @@ func (d *Daemon) Run() {
 	}
 	data, err := serialize(packet)
 	if err != nil {
-		d.Logger.Fatal(err)
+		d.logger.Fatal(err)
 	}
 
 	// send broadcasts at ten minute intervals
@@ -133,12 +133,12 @@ func (d *Daemon) Run() {
 	for {
 		select {
 		case <-d.DoneCh:
-			d.Logger.Fatal("Shutting down skywire-peering-daemon")
+			d.logger.Fatal("Shutting down skywire-peering-daemon")
 			os.Exit(1)
 		case packet := <-d.PacketCh:
 			d.RegisterPacket(packet)
 		case <-shutDownCh:
-			d.Logger.Print("Shutting down skywire-peering-daemon")
+			d.logger.Print("Shutting down skywire-peering-daemon")
 			os.Exit(1)
 		}
 	}
@@ -149,7 +149,7 @@ func (d *Daemon) Run() {
 func (d *Daemon) RegisterPacket(data []byte) {
 	packet, err := Deserialize(data)
 	if err != nil {
-		d.Logger.Fatal(err)
+		d.logger.Fatal(err)
 	}
 	packet.T = time.Now().Unix()
 
@@ -157,16 +157,16 @@ func (d *Daemon) RegisterPacket(data []byte) {
 		if _, ok := d.PacketMap[packet.PublicKey]; !ok {
 			d.PacketMap[packet.PublicKey] = packet.IP
 
-			d.Logger.Infof("Received packet %s: %s", packet.PublicKey, packet.IP)
+			d.logger.Infof("Received packet %s: %s", packet.PublicKey, packet.IP)
 			data, err := serialize(packet)
 
 			if err != nil {
-				d.Logger.Fatalf("Couldn't serialize packet: %s", err)
+				d.logger.Fatalf("Couldn't serialize packet: %s", err)
 			}
 
 			err = write(data, d.NamedPipe)
 			if err != nil {
-				d.Logger.Fatalf("Error writing to named pipe: %s", err)
+				d.logger.Fatalf("Error writing to named pipe: %s", err)
 			}
 		}
 	}

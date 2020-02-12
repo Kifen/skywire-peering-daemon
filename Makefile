@@ -2,7 +2,7 @@ OPTS?=GO111MODULE=on
 TEST_OPTS?=-race -tags no_ci -cover -timeout=5m
 
 bin: ## build skywire-peering-daemon [`spd`]
-	${OPTS} go build -o ./skywire-peering-daemon ./cmd/daemon
+	${OPTS} go build -o ./skywire-peering-daemon ./cmd/skywire-peering-daemon
 
 build: dep bin ## Install dependencies, build binary. `go build` with ${OPTS}
 
