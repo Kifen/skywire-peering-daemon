@@ -4,20 +4,20 @@ import (
 	"os"
 	"log"
 
-	"github.com/SkycoinProject/skywire-peering-daemon/src/daemon"
+	spd "github.com/SkycoinProject/skywire-peering-daemon/pkg/daemon"
 	"github.com/spf13/cobra"
 )
 
 var (
-	pubKey, namedPipe string
+	pubKey, namedPipe, lAddr string
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "daemon",
-	Short: "A skywire-peering-daemon",
+	Use:   "skywire-peering-daemon",
+	Short: "A skywire-peering-skywire-peering-daemon",
 	Run: func(cmd *cobra.Command, args []string) {
-		daemon := apd.NewDaemon(pubKey, namedPipe)
-		daemon.Run()
+		d := spd.NewDaemon(pubKey, lAddr, pubKey)
+		d.Run()
 	},
 }
 
