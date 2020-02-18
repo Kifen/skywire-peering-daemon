@@ -19,7 +19,7 @@ format: ## Formats the code. Must have goimports installed (use make install-lin
 	${OPTS} goimports -w -local github.com/SkycoinProject/skywire-peering-daemon ./cmd
 
 install: ## install `skywire-peering-daemon`
-	${OPTS} go install ./cmd/daemon
+	${OPTS} go install ./cmd/skywire-peering-daemon
 
 install-linters: ## Install linters
 	- VERSION=1.21.0 ./ci_scripts/install-golangci-lint.sh

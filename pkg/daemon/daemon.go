@@ -13,7 +13,7 @@ import (
 
 const (
 	defaultBroadCastIP = "255.255.255.255"
-	port               = 3000
+	port               = 4000
 	packetLength       = 10
 )
 
@@ -24,28 +24,31 @@ type Packet struct {
 	T         int64
 }
 
+// Config defines configuration parameters for daemon
+type Config struct {
+	PubKey    string
+	LocalAddr string
+	NamedPipe string
+}
+
 // Daemon provides configuration parameters for a
 // skywire-peering-skywire-peering-daemon.
 type Daemon struct {
-	PublicKey string
-	localAddr string
+	conf      *Config
 	PacketMap map[string]string
 	DoneCh    chan error
 	PacketCh  chan []byte
 	logger    *logging.Logger
-	NamedPipe string
 }
 
 // NewDaemon returns a Daemon type
-func NewDaemon(pubKey, lAddr, namedPipe string) *Daemon {
+func NewDaemon(conf *Config) *Daemon {
 	return &Daemon{
-		PublicKey: pubKey,
-		localAddr: lAddr,
+		conf:      conf,
 		PacketMap: make(map[string]string),
 		DoneCh:    make(chan error),
 		PacketCh:  make(chan []byte, packetLength),
 		logger:    logger("SPD"),
-		NamedPipe: namedPipe,
 	}
 }
 
@@ -99,7 +102,7 @@ func (d *Daemon) Listen(port int) {
 		}
 
 		data := buffer[:n]
-		if !verifyPacket(d.PublicKey, data) {
+		if !verifyPacket(d.conf.PubKey, data) {
 			d.PacketCh <- data
 		}
 	}
@@ -109,15 +112,15 @@ func (d *Daemon) Listen(port int) {
 // The skywire-peering-daemon broadcasts a public key in a goroutine, and listens
 // for incoming broadcasts in another goroutine.
 func (d *Daemon) Run() {
-	d.logger.Info("Skywire-peering-daemon started")
+	d.logger.Info("Skywire-peering-daemon started...")
 	t := time.NewTicker(10 * time.Second)
 
 	shutDownCh := make(chan os.Signal, 1)
 	signal.Notify(shutDownCh, syscall.SIGTERM, syscall.SIGINT)
 
 	packet := Packet{
-		PublicKey: d.PublicKey,
-		IP:        d.localAddr,
+		PublicKey: d.conf.PubKey,
+		IP:        d.conf.LocalAddr,
 	}
 	data, err := serialize(packet)
 	if err != nil {
@@ -153,7 +156,7 @@ func (d *Daemon) RegisterPacket(data []byte) {
 	}
 	packet.T = time.Now().Unix()
 
-	if d.PublicKey != packet.PublicKey {
+	if d.conf.PubKey != packet.PublicKey {
 		if _, ok := d.PacketMap[packet.PublicKey]; !ok {
 			d.PacketMap[packet.PublicKey] = packet.IP
 
@@ -164,7 +167,7 @@ func (d *Daemon) RegisterPacket(data []byte) {
 				d.logger.Fatalf("Couldn't serialize packet: %s", err)
 			}
 
-			err = write(data, d.NamedPipe)
+			err = write(data, d.conf.NamedPipe)
 			if err != nil {
 				d.logger.Fatalf("Error writing to named pipe: %s", err)
 			}
