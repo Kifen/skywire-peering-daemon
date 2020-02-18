@@ -14,8 +14,9 @@ import (
 var cfg *spd.Config
 
 var rootCmd = &cobra.Command{
-	Use:   "skywire-peering-daemon",
-	Short: "A skywire-peering-skywire-peering-daemon",
+	Use: "skywire-peering-daemon",
+	Long: "Daemon to facilitate the setup of a local network via stcp transports" +
+		"by advertising a visor to other visors in a local network",
 	Run: func(cmd *cobra.Command, args []string) {
 		config := readEnv()
 		d := spd.NewDaemon(config)
