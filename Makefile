@@ -32,3 +32,7 @@ install-linters: ## Install linters
 lint: ## Run linters. Use make install-linters first
 	${OPTS} golangci-lint run -c .golangci.yml ./...
 	# The govet version in golangci-lint is out of date and has spurious warnings
+
+test: ## run tests
+	- go clean -testcache
+	go test ${TEST_OPTS} ./pkg/...
