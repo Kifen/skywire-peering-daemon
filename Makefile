@@ -1,3 +1,4 @@
+.DEFAULT_GOAL := help
 OPTS?=GO111MODULE=on
 TEST_OPTS?=-race -tags no_ci -cover -timeout=5m
 
@@ -39,4 +40,3 @@ test: ## run tests
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
-	
