@@ -21,18 +21,18 @@ const (
 type Packet struct {
 	PublicKey string
 	IP        string
-	T         int64
+	T         int64 // time packet is received
 }
 
 // Config defines configuration parameters for daemon
 type Config struct {
-	PubKey    string
-	LocalAddr string
-	NamedPipe string
+	PubKey     string
+	LocalAddr  string
+	SocketFile string
 }
 
 // Daemon provides configuration parameters for a
-// skywire-peering-skywire-peering-daemon.
+// skywire-peering-daemon.
 type Daemon struct {
 	conf      *Config
 	PacketMap map[string]string
@@ -167,10 +167,11 @@ func (d *Daemon) RegisterPacket(data []byte) {
 				d.logger.Fatalf("Couldn't serialize packet: %s", err)
 			}
 
-			err = write(data, d.conf.NamedPipe)
+			err = SendPacket(d.conf.SocketFile, data)
 			if err != nil {
-				d.logger.Fatalf("Error writing to named pipe: %s", err)
+				d.logger.Fatalf("Error writing to socketfile: %s", err)
 			}
+			d.logger.Info("Successfully sent packet over pipe")
 		}
 	}
 }

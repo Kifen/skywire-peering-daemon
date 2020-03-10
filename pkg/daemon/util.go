@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/SkycoinProject/skycoin/src/util/logging"
 )
@@ -58,26 +57,6 @@ func serialize(packet Packet) ([]byte, error) {
 	return buff.Bytes(), nil
 }
 
-func write(data []byte, filePath string) error {
-	logger(moduleName).Info("Sending packet over pipe")
-	stdOut, err := os.OpenFile(filePath, os.O_RDWR, 0600)
-	if err != nil {
-		return err
-	}
-
-	_, err = stdOut.Write(data)
-	if err != nil {
-		logger(moduleName).Fatal(err)
-	}
-
-	err = stdOut.Close()
-	if err != nil {
-		logger(moduleName).Fatal(err)
-	}
-
-	return nil
-}
-
 // Deserialize decodes a byte to a packet type
 func Deserialize(data []byte) (Packet, error) {
 	var packet Packet
@@ -98,4 +77,27 @@ func verifyPacket(pubKey string, data []byte) bool {
 	}
 
 	return packet.PublicKey == pubKey
+}
+
+// SendPacket sends packet to visor via unix sockets
+func SendPacket(socketFile string, packet []byte) error {
+	conn, err := net.Dial("unix", socketFile)
+	if err != nil {
+		logger("SPD").Info("ERRORS HERE...")
+		return err
+	}
+	defer func() {
+		err := conn.Close()
+		if err != nil {
+			logger("SPD").Error(err)
+		}
+	}()
+
+	n, err := conn.Write(packet)
+	if err != nil {
+		return err
+	}
+
+	logger("SPD").Infof("Wrote %d bytes", n)
+	return nil
 }

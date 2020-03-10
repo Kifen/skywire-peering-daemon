@@ -35,13 +35,13 @@ func Execute() {
 func readEnv() *spd.Config {
 	cfg = &spd.Config{}
 	viper.SetEnvPrefix("spd")
-	err := bindEnv("pubkey", "laddr", "named-pipe")
+	err := bindEnv("pubkey", "laddr", "socketfile")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	cfg.PubKey = viper.GetString("pubkey")
-	cfg.NamedPipe = viper.GetString("named-pipe")
+	cfg.SocketFile = viper.GetString("socketfile")
 	cfg.LocalAddr = viper.GetString("laddr")
 
 	return cfg
