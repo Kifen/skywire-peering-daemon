@@ -83,9 +83,9 @@ func verifyPacket(pubKey string, data []byte) bool {
 func SendPacket(socketFile string, packet []byte) error {
 	conn, err := net.Dial("unix", socketFile)
 	if err != nil {
-		logger("SPD").Info("ERRORS HERE...")
 		return err
 	}
+	
 	defer func() {
 		err := conn.Close()
 		if err != nil {
